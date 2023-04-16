@@ -4,6 +4,33 @@ import json
 import networkx as nx
 from networkx.readwrite import json_graph
 
+
+
+def build_graph_nodes(g_street, jobs, g_time_expanded):
+    # get max j_d for all jobs
+    max_j_d = max([job['j_d'] for job in jobs.values()])
+    print(max_j_d)
+
+    # Adding nodes 
+    # add all nodes from g_street for every time step in the time-expanded graph, g_time_expanded
+    for t in range(max_j_d):
+        for node in g_street.nodes():
+            g_time_expanded.add_node(f"{node}_{t}", pos=(node, t))
+
+def build_graph_arcs(g_street, jobs, g_time_expanded):
+    # Adding arcs
+    # add all arcs from g_street for every time step in the time-expanded graph, g_time_expanded
+    for t in range(max_j_d):
+        for arc in g_street.edges():
+            # check if arc is not out of bounds
+            if t + g_street.edges[arc]['weight'] <= max_j_d - 1:
+                print(f"add arc from {arc[0]}_{t} to {arc[1]}_{t + g_street.edges[arc]['weight']} with wight {g_street.edges[arc]['weight']}")
+                g_time_expanded.add_edge(f"{arc[0]}_{t}", f"{arc[1]}_{t + g_street.edges[arc]['weight']}", weight=g_street.edges[arc]['weight'])
+    
+
+
+
+
 # --- TODO ---
 # This function is missing not only its content but also proper documentation! We recommend you to finish the docstring
 # As a sidenote, in most code editors you can add function comment strings like below automatically with a key combination. For VSC, the extension autoDocstring is necessary.
@@ -12,8 +39,21 @@ def build_graph(g_street, jobs):
 
     Args:
         g_street (which datatype?): What is this?
-        jobs (which datatype?): Good documentation is important!
-
+        jobs (dict): Good documentation is important!
+            "jobs": {
+                "1": {
+                    "j_s": 2,   # start node
+                    "j_t": 1,   # target node
+                    "j_r": 1,   # release time
+                    "j_d": 2    # deadline
+                },
+                "0": {
+                    "j_s": 0,
+                    "j_t": 2,
+                    "j_r": 0,
+                    "j_d": 3
+                }
+            }
     Returns:
         (some datatype(s)): what do you want to return?
     """
@@ -21,27 +61,12 @@ def build_graph(g_street, jobs):
     # New directed graph
     g_time_expanded = nx.DiGraph()
 
-    # max j_d for all jobs
-    max_j_d = max([job['j_d'] for job in jobs])
+    # get max j_d for all jobs
+    max_j_d = max([job['j_d'] for job in jobs.values()])
 
-    # Adding nodes 
-    # add all nodes from g_street for every time step in the time-expanded graph, g_time_expanded
-    for t in range(max_j_d):
-        for node in g_street.nodes():
-            g_time_expanded.add_node((node, t))
+    build_graph_nodes(g_street, jobs, g_time_expanded)
 
-
-    # get length of nodes
-    n = len(g_street.nodes())
-
-    # Adding arcs --- TODO --- 
-    # add all arcs from g_street for every time step in the time-expanded graph, g_time_expanded
-    for t in range(max_j_d):   
-        for arc in g_street.edges():
-            # check time window constraints
-            if t + g_street[arc[0]][arc[1]]['weight'] <= max_j_d:
-                g_time_expanded.add_edge((arc[0], t), (arc[1], t), weight=g_street[arc[0]][arc[1]]['weight'])
-
+    build_graph_arcs(g_street, jobs, g_time_expanded)
 
     return g_time_expanded
 
@@ -84,13 +109,19 @@ def solve(full_instance_path):
 
     # --- Variables ---
 
+
+
     # Commodity arc variables
     x = {}  # --- TODO ---
+
+
 
     # Potentially additional variables? --- TODO ---
 
     # --- Constraints
     # --- TODO ---
+
+
 
     # Solve the model
     model.update()
