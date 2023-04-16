@@ -1,0 +1,1 @@
+{"graph": {"directed": false, "multigraph": false, "graph": {}, "nodes": [{"pos": [0, 0], "id": 0}, {"pos": [1, 0], "id": 1}], "links": [{"weight": 1, "source": 0, "target": 1}]}, "jobs": {"0": {"j_s": 1, "j_t": 0, "j_r": 1, "j_d": 3}, "1": {"j_s": 1, "j_t": 0, "j_r": 2, "j_d": 4}, "2": {"j_s": 0, "j_t": 1, "j_r": 1, "j_d": 3}}}

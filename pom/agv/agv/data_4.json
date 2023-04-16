@@ -1,0 +1,61 @@
+{
+    "graph": {
+        "directed": false,
+        "multigraph": false,
+        "graph": {},
+        "nodes": [
+            {
+                "pos": [
+                    0,
+                    0
+                ],
+                "id": 0
+            },
+            {
+                "pos": [
+                    0,
+                    1
+                ],
+                "id": 2
+            },
+            {
+                "pos": [
+                    0.5,
+                    0.5
+                ],
+                "id": 1
+            }
+        ],
+        "links": [
+            {
+                "weight": 1,
+                "source": 0,
+                "target": 1
+            },
+            {
+                "weight": 3,
+                "source": 0,
+                "target": 2
+            },
+            {
+                "weight": 1,
+                "source": 1,
+                "target": 2
+            }
+        ]
+    },
+    "jobs": {
+        "1": {
+            "j_s": 2,
+            "j_t": 1,
+            "j_r": 1,
+            "j_d": 2
+        },
+        "0": {
+            "j_s": 0,
+            "j_t": 2,
+            "j_r": 0,
+            "j_d": 3
+        }
+    }
+}
