@@ -9,7 +9,7 @@ from networkx.readwrite import json_graph
 def build_graph_nodes(g_street, jobs, g_time_expanded):
     # get max j_d for all jobs
     max_j_d = max([job['j_d'] for job in jobs.values()])
-    print(max_j_d)
+    node_num = len(g_street.nodes())
 
     # Adding nodes 
     # add all nodes from g_street for every time step in the time-expanded graph, g_time_expanded
@@ -17,16 +17,35 @@ def build_graph_nodes(g_street, jobs, g_time_expanded):
         for node in g_street.nodes():
             g_time_expanded.add_node(f"{node}_{t}", pos=(node, t))
 
+    # Adding source and sink nodes
+    # add source node for every time step in the time-expanded graph, g_time_expanded
+    for id, job in jobs.items():
+        print(id, job)
+        # add source node
+        print(f"add source node ({id}, start) on ({id}, 0)")
+        g_time_expanded.add_node(f"({id}, start)", pos=(id, -1))
+        
+        # add sink node
+        print(f"add sink node ({id}, end) on ({node_num}, {job['j_d'] + int(id)})")
+        g_time_expanded.add_node(f"({id}, end)", pos=(node_num + int(id), job['j_d']))
+
+    print(nx.get_node_attributes(g_time_expanded, 'pos'))
+
 def build_graph_arcs(g_street, jobs, g_time_expanded):
     # Adding arcs
     # add all arcs from g_street for every time step in the time-expanded graph, g_time_expanded
     for t in range(max_j_d):
         for arc in g_street.edges():
-            # check if arc is not out of bounds
+            # check if arc is not out of bounds, then add links
             if t + g_street.edges[arc]['weight'] <= max_j_d - 1:
                 print(f"add arc from {arc[0]}_{t} to {arc[1]}_{t + g_street.edges[arc]['weight']} with wight {g_street.edges[arc]['weight']}")
                 g_time_expanded.add_edge(f"{arc[0]}_{t}", f"{arc[1]}_{t + g_street.edges[arc]['weight']}", weight=g_street.edges[arc]['weight'])
-    
+
+    # add waiting arcs
+    for t in range(max_j_d - 1):
+        for node in g_street.nodes():
+            g_time_expanded.add_edge(f"{node}_{t}", f"{node}_{t + 1}", weight = 1)
+
 
 
 
