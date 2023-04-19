@@ -33,22 +33,22 @@ def build_graph_arcs(g_street, jobs, g_time_expanded):
         for arc in g_street.edges():
             # check if arc is not out of bounds, then add links
             if t + g_street.edges[arc]['weight'] <= max_j_d:
-                g_time_expanded.add_edge((arc[0], t), (arc[1], t + g_street.edges[arc]['weight']))
-                g_time_expanded.add_edge((arc[1], t), (arc[0], t + g_street.edges[arc]['weight']))
+                g_time_expanded.add_edge((arc[0], t), (arc[1], t + g_street.edges[arc]['weight']), weight = g_street.edges[arc]['weight'])
+                g_time_expanded.add_edge((arc[1], t), (arc[0], t + g_street.edges[arc]['weight']), weight = g_street.edges[arc]['weight'])
 
     # add waiting arcs
     for t in range(max_j_d):
         for node in g_street.nodes():
-            g_time_expanded.add_edge((node, t), (node, t + 1))
+            g_time_expanded.add_edge((node, t), (node, t + 1), weight = 1)
 
     # add arcs from source node to first node of job and from last node of job to sink node
     for id, job in jobs.items():
         # add arc from source node to first node(start location with release tiem) of job
-        g_time_expanded.add_edge((id, 'start'), (job['j_s'], job['j_r']))
+        g_time_expanded.add_edge((id, 'start'), (job['j_s'], job['j_r']), weight = 0)
 
         # add arc from last node of job to sink node
         for t in range(job['j_r'], job['j_d'] + 1):
-            g_time_expanded.add_edge((job['j_t'], t), (id, 'end'))
+            g_time_expanded.add_edge((job['j_t'], t), (id, 'end'), weight = 0)
 
 
 # --- TODO ---
@@ -125,6 +125,9 @@ def solve(full_instance_path):
 
     # Construct graph --- NOTE: Please use networkx for this task, it is necessary for the plots in the Jupyter file.
     g_time_expanded = build_graph(g_street, jobs)
+    
+    max_j_d = max([job['j_d'] for job in jobs.values()])
+
 
     # === Gurobi model ===
     model = Model("AGV")
@@ -133,22 +136,41 @@ def solve(full_instance_path):
     # Commodity arc variables
     x = {}
     for e in g_time_expanded.edges:
-        x[e] = model.addVar(name=f"x_{e}", vtype="b", obj=1)
-
-    # Potentially additional variables? --- TODO ---
+        for id in jobs.keys():
+            x[e[0], e[1], id] = model.addVar(name=f"x_{e[0]}_{e[1]}_{id}", vtype="b")
+            # x[e] = model.addVar(name=f"x_{e}", vtype="b", obj=1)
 
     # --- Constraints
     # multi-commodity Flow conservation constraints
+    # constraints for every job
+    for id, job in jobs.items():
+        # constraints for every node in the time-expanded graph
+        for node in g_time_expanded.nodes:
+            if node[1] != 'start' and node[1] != 'end':
+                model.addConstr(quicksum(x[(e[0], node)] for e in g_time_expanded.in_edges(node)) - 
+                                quicksum(x[(node, e[1])] for e in g_time_expanded.out_edges(node)) == 0)
+            if node[1] == 'start':
+                model.addConstr(quicksum(x[(e[0], node)] for e in g_time_expanded.in_edges(node)) - 
+                                quicksum(x[(node, e[1])] for e in g_time_expanded.out_edges(node)) == -1)
+            if node[1] == 'end':
+                model.addConstr(quicksum(x[(e[0], node)] for e in g_time_expanded.in_edges(node)) - 
+                                quicksum(x[(node, e[1])] for e in g_time_expanded.out_edges(node)) == 1)
+
+
+
+
+
+    # arcs constraints
     for node in g_time_expanded.nodes:
         if node[1] != 'start' and node[1] != 'end':
-            model.addConstr(quicksum(x[(e[0], node)] for e in g_time_expanded.in_edges(node)) - 
-                            quicksum(x[(node, e[1])] for e in g_time_expanded.out_edges(node)) == 0)
-        if node[1] == 'start':
-            model.addConstr(quicksum(x[(e[0], node)] for e in g_time_expanded.in_edges(node)) - 
-                            quicksum(x[(node, e[1])] for e in g_time_expanded.out_edges(node)) == -1)
-        if node[1] == 'end':
-            model.addConstr(quicksum(x[(e[0], node)] for e in g_time_expanded.in_edges(node)) - 
-                            quicksum(x[(node, e[1])] for e in g_time_expanded.out_edges(node)) == 1)
+            for e in g_time_expanded.out_edges(node):
+                if e[0][1] != e[1][0] and e[1][1] != 'end' and e[1][1] != 'start':
+                        model.addConstr(x[e] + sum(x[((e[1][0], e[0][1] + w), (e[0][0], e[1][1] + w))] 
+                                            for w in range((g_time_expanded.edges[e]['weight'], max_j_d - e[1][1] + 1)[(e[1][1] + g_time_expanded.edges[e]['weight']) > max_j_d])) <= 1)
+
+    # --- Objective ---
+    # sum of the weight of all chosen edges
+    model.setObjective(quicksum(x[e] * g_time_expanded.edges[e]['weight'] for e in g_time_expanded.edges), GRB.MINIMIZE)
 
     # Solve the model
     model.update()
@@ -158,14 +180,17 @@ def solve(full_instance_path):
     # model.computeIIS()
     # model.write("model.ilp")
 
-    # # Obtain a list of vertices that are in the solution
-    # stable_set = []
-    # if model.status == GRB.OPTIMAL:
-    #     for v in G.nodes:
-    #         if round(x[v].x) == 1:
-    #             stable_set.append(v)
+
+
+    res = nx.DiGraph()
+
+    build_graph_nodes(g_street, jobs, res)
     
-    # color_map = ["blue" if v not in stable_set else "red" for v in G.nodes]
+    if model.status == GRB.OPTIMAL:
+        for e in g_time_expanded.edges:
+            if round(x[e].x) == 1:
+                res.add_edge(e[0], e[1])
+    
 
 
-    return model, g_time_expanded
+    return model, g_time_expanded, res
