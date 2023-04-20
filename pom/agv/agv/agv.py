@@ -4,6 +4,21 @@ import json
 import networkx as nx
 from networkx.readwrite import json_graph
 
+# You do not need to change anything in this function
+def read_instance(full_instance_path):
+    """Reads JSON file
+
+    Args:
+        full_instance_path (string): Path to the instance
+
+    Returns:
+        Dictionary: Jobs
+        nx.DiGraph: Graph of the street network
+    """
+    with open(full_instance_path) as f:
+        data = json.load(f)
+    return (data['jobs'], json_graph.node_link_graph(data['graph']))
+
 
 def build_graph_nodes(g_street, jobs, g_time_expanded):
     # get max j_d for all jobs and number of nodes in g_street
@@ -22,7 +37,6 @@ def build_graph_nodes(g_street, jobs, g_time_expanded):
         # add sink node
         g_time_expanded.add_node((id, 'end'), pos=(
             node_num + int(id), job['j_d'] + 2))
-
 
 def build_graph_arcs(g_street, jobs, g_time_expanded):
     max_j_d = max([job['j_d'] for job in jobs.values()])
@@ -50,8 +64,6 @@ def build_graph_arcs(g_street, jobs, g_time_expanded):
         for t in range(job['j_r'], job['j_d'] + 1):
             g_time_expanded.add_edge((job['j_t'], t), (id, 'end'), weight = 0)
 
-
-# --- TODO ---
 # This function is missing not only its content but also proper documentation!
 # We recommend you to finish the docstring
 # As a sidenote, in most code editors you can add function comment strings like below
@@ -92,22 +104,6 @@ def build_graph(g_street, jobs):
     return g_time_expanded
 
 
-# You do not need to change anything in this function
-def read_instance(full_instance_path):
-    """Reads JSON file
-
-    Args:
-        full_instance_path (string): Path to the instance
-
-    Returns:
-        Dictionary: Jobs
-        nx.DiGraph: Graph of the street network
-    """
-    with open(full_instance_path) as f:
-        data = json.load(f)
-    return (data['jobs'], json_graph.node_link_graph(data['graph']))
-
-
 # Lots of work to do in this function!
 def solve(full_instance_path):
     """Solving function, takes an instance file, constructs the time-expanded graph, builds and solves a gurobi model
@@ -122,15 +118,14 @@ def solve(full_instance_path):
 
     # Read in the instance data
     jobs, g_street = read_instance(full_instance_path)
+    max_j_d = max([job['j_d'] for job in jobs.values()])
 
     # Construct graph --- NOTE: Please use networkx for this task, it is necessary for the plots in the Jupyter file.
     g_time_expanded = build_graph(g_street, jobs)
-    
-    max_j_d = max([job['j_d'] for job in jobs.values()])
-
 
     # === Gurobi model ===
     model = Model("AGV")
+
 
     # --- Variables ---
     # Commodity arc variables
@@ -142,21 +137,21 @@ def solve(full_instance_path):
 
     # --- Constraints
     # multi-commodity Flow conservation constraints
-    # constraints for every job
+    # flow constraints for nodes for every job 
     for id, job in jobs.items():
         # constraints for every node in the time-expanded graph
         for node in g_time_expanded.nodes:
-            if node[1] != 'start' and node[1] != 'end':
-                model.addConstr(quicksum(x[(e[0], node)] for e in g_time_expanded.in_edges(node)) - 
-                                quicksum(x[(node, e[1])] for e in g_time_expanded.out_edges(node)) == 0)
-            if node[1] == 'start':
-                model.addConstr(quicksum(x[(e[0], node)] for e in g_time_expanded.in_edges(node)) - 
-                                quicksum(x[(node, e[1])] for e in g_time_expanded.out_edges(node)) == -1)
-            if node[1] == 'end':
-                model.addConstr(quicksum(x[(e[0], node)] for e in g_time_expanded.in_edges(node)) - 
-                                quicksum(x[(node, e[1])] for e in g_time_expanded.out_edges(node)) == 1)
-
-
+            # print(node)
+            if node != (id, 'start') and node != (id, 'end'):
+                model.addConstr(quicksum(x[(e[0], node, id)] for e in g_time_expanded.in_edges(node)) - 
+                                quicksum(x[(node, e[1], id)] for e in g_time_expanded.out_edges(node)) == 0)
+            if node == (id, 'start'):
+                print("*******")
+                model.addConstr(quicksum(x[(e[0], node, id)] for e in g_time_expanded.in_edges(node)) - 
+                                quicksum(x[(node, e[1], id)] for e in g_time_expanded.out_edges(node)) == -1)
+            if node == (id, 'end'):
+                model.addConstr(quicksum(x[(e[0], node, id)] for e in g_time_expanded.in_edges(node)) - 
+                                quicksum(x[(node, e[1], id)] for e in g_time_expanded.out_edges(node)) == 1)
 
 
 
@@ -170,7 +165,7 @@ def solve(full_instance_path):
 
     # --- Objective ---
     # sum of the weight of all chosen edges
-    model.setObjective(quicksum(x[e] * g_time_expanded.edges[e]['weight'] for e in g_time_expanded.edges), GRB.MINIMIZE)
+    model.setObjective(quicksum(x[(e[0], e[1], id)] * g_time_expanded.edges[e]['weight'] for e in g_time_expanded.edges for id in jobs.keys()), GRB.MINIMIZE)
 
     # Solve the model
     model.update()
@@ -183,13 +178,16 @@ def solve(full_instance_path):
 
 
     res = nx.DiGraph()
-
     build_graph_nodes(g_street, jobs, res)
     
     if model.status == GRB.OPTIMAL:
-        for e in g_time_expanded.edges:
-            if round(x[e].x) == 1:
-                res.add_edge(e[0], e[1])
+        for job in jobs.keys():
+            for e in g_time_expanded.edges:
+                if round(x[(e[0], e[1], job)].x) == 1:
+                    print(e[0], e[1], job)  
+                    res.add_edge(e[0], e[1])
+            # if round(sum(x[(e[0], e[1], job)].x for job in jobs.keys())) == 1:
+            #     res.add_edge(e[0], e[1])
     
 
 
