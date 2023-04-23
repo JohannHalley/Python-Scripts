@@ -146,22 +146,23 @@ def solve(full_instance_path):
                 model.addConstr(quicksum(x[(e[0], node, id)] for e in g_time_expanded.in_edges(node)) - 
                                 quicksum(x[(node, e[1], id)] for e in g_time_expanded.out_edges(node)) == 0)
             if node == (id, 'start'):
-                print("*******")
                 model.addConstr(quicksum(x[(e[0], node, id)] for e in g_time_expanded.in_edges(node)) - 
                                 quicksum(x[(node, e[1], id)] for e in g_time_expanded.out_edges(node)) == -1)
             if node == (id, 'end'):
                 model.addConstr(quicksum(x[(e[0], node, id)] for e in g_time_expanded.in_edges(node)) - 
                                 quicksum(x[(node, e[1], id)] for e in g_time_expanded.out_edges(node)) == 1)
 
-
-
     # arcs constraints
     for node in g_time_expanded.nodes:
-        if node[1] != 'start' and node[1] != 'end':
+        if node != (id, 'start') and node != (id, 'end'):
             for e in g_time_expanded.out_edges(node):
-                if e[0][1] != e[1][0] and e[1][1] != 'end' and e[1][1] != 'start':
-                        model.addConstr(x[e] + sum(x[((e[1][0], e[0][1] + w), (e[0][0], e[1][1] + w))] 
-                                            for w in range((g_time_expanded.edges[e]['weight'], max_j_d - e[1][1] + 1)[(e[1][1] + g_time_expanded.edges[e]['weight']) > max_j_d])) <= 1)
+                #  no need to consider waiting arcs, no end, no start
+                if e[0][0] != e[1][0] and e[1][1] not in ('start', 'end'):
+                        # variable is edge with a job id
+                        for id in jobs.keys():
+                            model.addConstr(x[(e[0], e[1], id)] + sum(x[((e[1][0], e[0][1] + w), (e[0][0], e[1][1] + w), id2)] 
+                                                for w in range((g_time_expanded.edges[e]['weight'], max_j_d - e[1][1] + 1)[(e[1][1] + g_time_expanded.edges[e]['weight']) > max_j_d])
+                                                for id2 in jobs.keys()) <= 1)
 
     # --- Objective ---
     # sum of the weight of all chosen edges
@@ -175,8 +176,6 @@ def solve(full_instance_path):
     # model.computeIIS()
     # model.write("model.ilp")
 
-
-
     res = nx.DiGraph()
     build_graph_nodes(g_street, jobs, res)
     
@@ -184,11 +183,10 @@ def solve(full_instance_path):
         for job in jobs.keys():
             for e in g_time_expanded.edges:
                 if round(x[(e[0], e[1], job)].x) == 1:
-                    print(e[0], e[1], job)  
                     res.add_edge(e[0], e[1])
             # if round(sum(x[(e[0], e[1], job)].x for job in jobs.keys())) == 1:
             #     res.add_edge(e[0], e[1])
     
 
-
+    # return model, g_time_expanded
     return model, g_time_expanded, res
