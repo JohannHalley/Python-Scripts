@@ -38,6 +38,20 @@ def build_graph_nodes(g_street, jobs, g_time_expanded):
         g_time_expanded.add_node((id, 'end'), pos=(
             node_num + int(id), job['j_d'] + 2))
 
+    # Adding source and sink nodes
+    # add source node for every time step in the time-expanded graph, g_time_expanded
+    for id, job in jobs.items():
+        print(id, job)
+        # add source node
+        print(f"add source node ({id}, start) on ({id}, 0)")
+        g_time_expanded.add_node(f"({id}, start)", pos=(id, -1))
+        
+        # add sink node
+        print(f"add sink node ({id}, end) on ({node_num}, {job['j_d'] + int(id)})")
+        g_time_expanded.add_node(f"({id}, end)", pos=(node_num + int(id), job['j_d']))
+
+    print(nx.get_node_attributes(g_time_expanded, 'pos'))
+
 def build_graph_arcs(g_street, jobs, g_time_expanded):
     max_j_d = max([job['j_d'] for job in jobs.values()])
 
@@ -49,6 +63,7 @@ def build_graph_arcs(g_street, jobs, g_time_expanded):
             if t + g_street.edges[arc]['weight'] <= max_j_d:
                 g_time_expanded.add_edge((arc[0], t), (arc[1], t + g_street.edges[arc]['weight']), weight = g_street.edges[arc]['weight'])
                 g_time_expanded.add_edge((arc[1], t), (arc[0], t + g_street.edges[arc]['weight']), weight = g_street.edges[arc]['weight'])
+
 
     # add waiting arcs
     for t in range(max_j_d):
