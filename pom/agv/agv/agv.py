@@ -41,14 +41,13 @@ def build_graph_nodes(g_street, jobs, g_time_expanded):
     # Adding source and sink nodes
     # add source node for every time step in the time-expanded graph, g_time_expanded
     for id, job in jobs.items():
-        print(id, job)
         # add source node
         g_time_expanded.add_node(f"({id}, start)", pos=(id, -1))
         
         # add sink node
         g_time_expanded.add_node(f"({id}, end)", pos=(node_num + int(id), job['j_d']))
 
-    print(nx.get_node_attributes(g_time_expanded, 'pos'))
+    # print(nx.get_node_attributes(g_time_expanded, 'pos'))
 
 def build_graph_arcs(g_street, jobs, g_time_expanded):
     max_j_d = max([job['j_d'] for job in jobs.values()])
