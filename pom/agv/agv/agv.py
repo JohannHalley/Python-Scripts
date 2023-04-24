@@ -43,11 +43,9 @@ def build_graph_nodes(g_street, jobs, g_time_expanded):
     for id, job in jobs.items():
         print(id, job)
         # add source node
-        print(f"add source node ({id}, start) on ({id}, 0)")
         g_time_expanded.add_node(f"({id}, start)", pos=(id, -1))
         
         # add sink node
-        print(f"add sink node ({id}, end) on ({node_num}, {job['j_d'] + int(id)})")
         g_time_expanded.add_node(f"({id}, end)", pos=(node_num + int(id), job['j_d']))
 
     print(nx.get_node_attributes(g_time_expanded, 'pos'))
@@ -174,8 +172,9 @@ def solve(full_instance_path):
                 #  no need to consider waiting arcs, no end, no start
                 if e[0][0] != e[1][0] and e[1][1] not in ('start', 'end'):
                         # variable is edge with a job id
-                        for id in jobs.keys():
-                            model.addConstr(x[(e[0], e[1], id)] + sum(x[((e[1][0], e[0][1] + w), (e[0][0], e[1][1] + w), id2)] 
+                        # for id in jobs.keys():
+                            model.addConstr(sum(x[(e[0], e[1], id)] for id in jobs.keys()) + 
+                                            sum(x[((e[1][0], e[0][1] + w), (e[0][0], e[1][1] + w), id2)] 
                                                 for w in range((g_time_expanded.edges[e]['weight'], max_j_d - e[1][1] + 1)[(e[1][1] + g_time_expanded.edges[e]['weight']) > max_j_d])
                                                 for id2 in jobs.keys()) <= 1)
 
