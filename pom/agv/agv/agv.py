@@ -27,30 +27,17 @@ def build_graph_nodes(g_street, jobs, g_time_expanded):
 
     for l in g_street.nodes():
         for t in range(max_j_d + 1):
-            g_time_expanded.add_node((l, t), pos=(l, t + 1))
+            # row 0 for source node
+            g_time_expanded.add_node((l,t), pos=(l, t + 1))
 
     # Adding source and sink nodes
     # add source node for every time step in the time-expanded graph, g_time_expanded
     for id, job in jobs.items():
-        # add source node
-        g_time_expanded.add_node((id, 'start'), pos=(int(id), 0))
-        # add sink node
-        g_time_expanded.add_node((id, 'end'), pos=(
-            node_num + int(id), job['j_d'] + 2))
+        # add source node at row 0
+        g_time_expanded.add_node((id,'start'), pos=(int(id), 0))
+        # add sink node at 1 more row than ddl time, means (ddl time + +1)
+        g_time_expanded.add_node((id,'end'), pos=(node_num + int(id), job['j_d'] + 2))
 
-    # Adding source and sink nodes
-    # add source node for every time step in the time-expanded graph, g_time_expanded
-    for id, job in jobs.items():
-        print(id, job)
-        # add source node
-        print(f"add source node ({id}, start) on ({id}, 0)")
-        g_time_expanded.add_node(f"({id}, start)", pos=(id, -1))
-        
-        # add sink node
-        print(f"add sink node ({id}, end) on ({node_num}, {job['j_d'] + int(id)})")
-        g_time_expanded.add_node(f"({id}, end)", pos=(node_num + int(id), job['j_d']))
-
-    print(nx.get_node_attributes(g_time_expanded, 'pos'))
 
 def build_graph_arcs(g_street, jobs, g_time_expanded):
     max_j_d = max([job['j_d'] for job in jobs.values()])
@@ -147,8 +134,7 @@ def solve(full_instance_path):
     x = {}
     for e in g_time_expanded.edges:
         for id in jobs.keys():
-            x[e[0], e[1], id] = model.addVar(name=f"x_{e[0]}_{e[1]}_{id}", vtype="b")
-            # x[e] = model.addVar(name=f"x_{e}", vtype="b", obj=1)
+            x[e[0], e[1], id] = model.addVar(name=f"x_{e}_{id}".format(e,id).replace(" ",""), vtype="b")
 
     # --- Constraints
     # multi-commodity Flow conservation constraints
@@ -174,8 +160,9 @@ def solve(full_instance_path):
                 #  no need to consider waiting arcs, no end, no start
                 if e[0][0] != e[1][0] and e[1][1] not in ('start', 'end'):
                         # variable is edge with a job id
-                        for id in jobs.keys():
-                            model.addConstr(x[(e[0], e[1], id)] + sum(x[((e[1][0], e[0][1] + w), (e[0][0], e[1][1] + w), id2)] 
+                        # for id in jobs.keys():
+                            model.addConstr(sum(x[(e[0], e[1], id)] for id in jobs.keys()) + 
+                                            sum(x[((e[1][0], e[0][1] + w), (e[0][0], e[1][1] + w), id2)] 
                                                 for w in range((g_time_expanded.edges[e]['weight'], max_j_d - e[1][1] + 1)[(e[1][1] + g_time_expanded.edges[e]['weight']) > max_j_d])
                                                 for id2 in jobs.keys()) <= 1)
 
@@ -186,6 +173,8 @@ def solve(full_instance_path):
     # Solve the model
     model.update()
     model.optimize()
+    model.write('model.lp')
+
 
     # If your model is infeasible (but you expect it to not be), comment out the lines below to compute and write out a infeasible subsystem (Might take very long)
     # model.computeIIS()
@@ -203,5 +192,5 @@ def solve(full_instance_path):
             #     res.add_edge(e[0], e[1])
     
 
-    # return model, g_time_expanded
-    return model, g_time_expanded, res
+    return model, g_time_expanded
+    # return model, g_time_expanded, res
