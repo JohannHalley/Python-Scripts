@@ -134,41 +134,42 @@ def solve(full_instance_path):
     x = {}
     for e in g_time_expanded.edges:
         for id in jobs.keys():
-            x[e[0], e[1], id] = model.addVar(name=f"x_{e}_{id}".format(e,id).replace(" ",""), vtype="b")
+            x[e, id] = model.addVar(name=f"x_{e}_{id}".format(e,id).replace(" ",""), vtype="b")
 
-    # --- Constraints
-    # multi-commodity Flow conservation constraints
+    # --- Constraints, multi-commodity Flow conservation constraints ---
     # flow constraints for nodes for every job 
     for id, job in jobs.items():
         # constraints for every node in the time-expanded graph
         for node in g_time_expanded.nodes:
-            # print(node)
             if node != (id, 'start') and node != (id, 'end'):
-                model.addConstr(quicksum(x[(e[0], node, id)] for e in g_time_expanded.in_edges(node)) - 
-                                quicksum(x[(node, e[1], id)] for e in g_time_expanded.out_edges(node)) == 0)
+                model.addConstr(quicksum(x[(e[0], node), id] for e in g_time_expanded.in_edges(node)) - 
+                                quicksum(x[(node, e[1]), id] for e in g_time_expanded.out_edges(node)) == 0)
             if node == (id, 'start'):
-                model.addConstr(quicksum(x[(e[0], node, id)] for e in g_time_expanded.in_edges(node)) - 
-                                quicksum(x[(node, e[1], id)] for e in g_time_expanded.out_edges(node)) == -1)
+                model.addConstr(quicksum(x[(e[0], node), id] for e in g_time_expanded.in_edges(node)) - 
+                                quicksum(x[(node, e[1]), id] for e in g_time_expanded.out_edges(node)) == -1)
             if node == (id, 'end'):
-                model.addConstr(quicksum(x[(e[0], node, id)] for e in g_time_expanded.in_edges(node)) - 
-                                quicksum(x[(node, e[1], id)] for e in g_time_expanded.out_edges(node)) == 1)
+                model.addConstr(quicksum(x[(e[0], node), id] for e in g_time_expanded.in_edges(node)) - 
+                                quicksum(x[(node, e[1]), id] for e in g_time_expanded.out_edges(node)) == 1)
 
     # arcs constraints
     for node in g_time_expanded.nodes:
         if node != (id, 'start') and node != (id, 'end'):
             for e in g_time_expanded.out_edges(node):
-                #  no need to consider waiting arcs, no end, no start
-                if e[0][0] != e[1][0] and e[1][1] not in ('start', 'end'):
-                        # variable is edge with a job id
-                        # for id in jobs.keys():
-                            model.addConstr(sum(x[(e[0], e[1], id)] for id in jobs.keys()) + 
-                                            sum(x[((e[1][0], e[0][1] + w), (e[0][0], e[1][1] + w), id2)] 
-                                                for w in range((g_time_expanded.edges[e]['weight'], max_j_d - e[1][1] + 1)[(e[1][1] + g_time_expanded.edges[e]['weight']) > max_j_d])
-                                                for id2 in jobs.keys()) <= 1)
+                # for waiting arcs
+                if e[0][0] == e[1][0]:
+                    model.addConstr(sum(x[e, id] for id in jobs.keys()) <= 1)
+                #  no end arcs, no start arcs
+                elif e[1][1] not in ('start', 'end'):
+                    model.addConstr(sum(x[e, id] for id in jobs.keys()) + 
+                                    sum(x[((e[1][0], e[0][1] + w), (e[0][0], e[1][1] + w)), id2] 
+                                        for w in range((g_time_expanded.edges[e]['weight'], max_j_d - e[1][1] + 1)[(e[1][1] + g_time_expanded.edges[e]['weight']) > max_j_d])
+                                        for id2 in jobs.keys()) <= 1)
+
+
 
     # --- Objective ---
     # sum of the weight of all chosen edges
-    model.setObjective(quicksum(x[(e[0], e[1], id)] * g_time_expanded.edges[e]['weight'] for e in g_time_expanded.edges for id in jobs.keys()), GRB.MINIMIZE)
+    model.setObjective(quicksum(x[e, id] * g_time_expanded.edges[e]['weight'] for e in g_time_expanded.edges for id in jobs.keys()), GRB.MINIMIZE)
 
     # Solve the model
     model.update()
@@ -186,7 +187,7 @@ def solve(full_instance_path):
     if model.status == GRB.OPTIMAL:
         for job in jobs.keys():
             for e in g_time_expanded.edges:
-                if round(x[(e[0], e[1], job)].x) == 1:
+                if round(x[e, job].x) == 1:
                     res.add_edge(e[0], e[1])
             # if round(sum(x[(e[0], e[1], job)].x for job in jobs.keys())) == 1:
             #     res.add_edge(e[0], e[1])

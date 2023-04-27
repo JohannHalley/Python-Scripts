@@ -34,19 +34,17 @@ def solve(instance_path):
     # TODO: Add your constraints ----------------------------------------------
     # Constraint 1: Each vertex has exactly one color
     for vertex in G.nodes:
-        model.addConstr(quicksum(x[vertex, color] for color in colors) == 1)   
-    
-    # Constraint 2: the 2 vertices that are connected by an edge cannot have the same color
-    for vertex1 in G.nodes:
-        for vertex2 in G.nodes:
-            if G.has_edge(vertex1, vertex2):
-                for color in colors:
-                    model.addConstr(x[vertex1, color] + x[vertex2, color] <= 1)
+        model.addConstr(quicksum(x[vertex, color] for color in colors) == 1)
 
-    # Constraint 3: If a vertex has a color, then the color is used
-    for vertex in G.nodes:
+    # Constraint 2: No two adjacent vertices have the same color
+    for edge in G.edges:
         for color in colors:
-            model.addConstr(x[vertex, color] <= y[color])  
+            model.addConstr(x[edge[0], color] + x[edge[1], color] <= 1)
+    
+    # Constraint 3: y_c = 1 if color c is used
+    for color in colors:
+        for vertex in G.nodes:
+            model.addConstr(x[vertex, color] <= y[color])
 
 
     # -------------------------------------------------------------------------
