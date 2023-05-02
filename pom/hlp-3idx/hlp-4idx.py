@@ -8,7 +8,7 @@ def read_instance(instance_path):
     return data["p"], data["c"], data["alpha"], data["customers"], data["distances"], data["demands"]
 
 def solve(p, c, alpha, customers, distances, demands):
-    """Solves the hub location problem using the 3-index formulation.
+    """Solves the hub location problem using the 4-index formulation.
 
     Args:
         p (int): number of hubs to open
@@ -31,48 +31,17 @@ def solve(p, c, alpha, customers, distances, demands):
 
     # --- Variables ---
 
-    # x is a binary variable indicating whether customer i is served by hub j
-    x = tupledict()
-    for i in customers:
-        for j in customers:
-            x[i, j] = model.addVar(vtype="b", name=f"x_{i}_{j}")
+    # x = tupledict()
+    # for ... 
+        # x[i, j, k, l] = model.addVar(vtype="c", lb=0, name=f"x_{i}_{j}_{k}_{l}",
+        # obj = ...)
 
-    # hub is a binary variable indicating whether a hub is located at location j
-    hub = tupledict()
-    for i in customers:
-        hub[i] = model.addVar(vtype="b", name=f"hub_{i}")
+    # more variables are necessary
 
-    
-    # y is teh amount of demand originating from customer i that transported from hub k to hub l
-    y = tupledict()
-    for i in customers:
-        for k in range(p):
-            for l in range(p):
-                y[i, k, l] = model.addVar(vtype="c", lb=0, name=f"y_{i}_{k}_{l}")
-    
-
-    # -------------------------------------------------------------------------
     model.update()
-    # -------------------------------------------------------------------------
 
     # --- Constraints ---
-    # maximal p hubs
-    model.addConstr(quicksum(hub[i] for i in customers) <= p)
 
-    # each customer is served by exactly one hub
-    for i in customers:
-        model.addConstr(quicksum(x[i, j] for j in customers) == 1)
-        for j in customers:
-            # if customer i is served by hub j, then a hub must be located at location j.
-            model.addConstr(x[i, j] <= hub[j])
-
-    # --- Objective ---
-    # minimize the total cost
-    model.setObjective(quicksum(c * distances[i][j] * demands[i][j] * x[i, j] for i in customers for j in customers)+ 
-                       # TODO: add the intra-hub transport costs
-                       quicksum(alpha * c * distances[i][j] * demands[i][j] * y[i, k, l] for i in customers for k in range(p) for l in range(p)), 
-                       GRB.MINIMIZE)
-    
 
     # --- Solve model ---
 
