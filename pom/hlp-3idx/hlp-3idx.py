@@ -31,23 +31,22 @@ def solve(p, c, alpha, customers, distances, demands):
 
     # --- Variables ---
 
-    # x is a binary variable indicating whether customer i is served by hub j
+    # x_i_k equal to one if and only if node i is assigned to hub k
     x = tupledict()
     for i in customers:
-        for j in customers:
-            x[i, j] = model.addVar(vtype="b", name=f"x_{i}_{j}")
-
-    # hub is a binary variable indicating whether a hub is located at location j
-    hub = tupledict()
-    for i in customers:
-        hub[i] = model.addVar(vtype="b", name=f"hub_{i}")
-
+        for k in customers:
+            x[i, k] = model.addVar(vtype="b", name=f"x_{i}_{k}")
     
-    # y is teh amount of demand originating from customer i that transported from hub k to hub l
+    # y = tupledict()
+    # for ... 
+        # y[i, k, l] = model.addVar(vtype="c", lb=0, name=f"y_{i}_{k}_{l}",
+        # obj = ...)
+
+    # y is the amount of demand originating from customer i that transported from hub k to hub l
     y = tupledict()
     for i in customers:
-        for k in range(p):
-            for l in range(p):
+        for k in customers:
+            for l in customers:
                 y[i, k, l] = model.addVar(vtype="c", lb=0, name=f"y_{i}_{k}_{l}")
     
 
@@ -56,22 +55,31 @@ def solve(p, c, alpha, customers, distances, demands):
     # -------------------------------------------------------------------------
 
     # --- Constraints ---
-    # maximal p hubs
-    model.addConstr(quicksum(hub[i] for i in customers) <= p)
+    # 1. maximal p hubs
+    model.addConstr(quicksum(x[i, i] for i in customers) <= p)
 
-    # each customer is served by exactly one hub
+    # 2. each customer is served by exactly one hub
     for i in customers:
-        model.addConstr(quicksum(x[i, j] for j in customers) == 1)
-        for j in customers:
-            # if customer i is served by hub j, then a hub must be located at location j.
-            model.addConstr(x[i, j] <= hub[j])
+        model.addConstr(quicksum(x[i, k] for k in customers) == 1)
+        # 3. customers are assigned to open hubs
+        for k in customers:
+            model.addConstr(x[i, k] <= x[k, k])
+    
+    # 4. the flow entering to hub l either directly from customer i or via other hubs k 
+    # has to be equal to the flow leaving to either other hubs k or to destination nodes j
+    for i in customers:
+        for l in customers:
+            model.addConstr(quicksum(demands[i][j] for j in customers) * x[i, l] + quicksum(y[i, k, l] for k in customers) == 
+                            quicksum(y[i, l, k] for k in customers) + quicksum(demands[i][j] * x[j, l] for j in customers))
+        
 
     # --- Objective ---
     # minimize the total cost
-    model.setObjective(quicksum(c * distances[i][j] * demands[i][j] * x[i, j] for i in customers for j in customers)+ 
-                       # TODO: add the intra-hub transport costs
-                       quicksum(alpha * c * distances[i][j] * demands[i][j] * y[i, k, l] for i in customers for k in range(p) for l in range(p)), 
-                       GRB.MINIMIZE)
+    model.setObjective(c * (quicksum(quicksum(demands[i][j] for j in customers) * quicksum(distances[i][j]  * x[i, j] for j in customers) +
+                                     quicksum(demands[j][i] for j in customers) * quicksum(distances[i][j]  * x[i, j] for j in customers)
+        for i in customers))
+        + alpha * c * quicksum(distances[k][l] * y[i, k, l] for i in customers for k in customers for l in customers), 
+        GRB.MINIMIZE)
     
 
     # --- Solve model ---
@@ -91,6 +99,6 @@ def solve(p, c, alpha, customers, distances, demands):
 
 
 if __name__ == "__main__":
-    p, c, alpha, customers, distances, demands = read_instance("n10.json")
+    p, c, alpha, customers, distances, demands = read_instance("n20.json")
 
     solve(p, c, alpha, customers, distances, demands) 
