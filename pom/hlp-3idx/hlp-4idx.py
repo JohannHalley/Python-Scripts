@@ -31,7 +31,14 @@ def solve(p, c, alpha, customers, distances, demands):
 
     # --- Variables ---
 
-    # x = tupledict()
+    # the flow originated at i and destination j transits via hub arc (k, l)
+    x = tupledict()
+    for i in customers:
+        for j in customers:
+            for k in customers:
+                for l in customers:
+                    x[i, j, k, l] = model.addVar(vtype="c", lb=0, name=f"x_{i}_{j}_{k}_{l}")
+
     # for ... 
         # x[i, j, k, l] = model.addVar(vtype="c", lb=0, name=f"x_{i}_{j}_{k}_{l}",
         # obj = ...)
