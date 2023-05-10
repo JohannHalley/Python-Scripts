@@ -75,18 +75,17 @@ def solve(p, c, alpha, customers, distances, demands):
 
     # --- Objective ---
     # minimize the total cost
-    model.setObjective(c * (quicksum(quicksum(demands[i][j] for j in customers) * quicksum(distances[i][j]  * x[i, j] for j in customers) +
-                                     quicksum(demands[j][i] for j in customers) * quicksum(distances[i][j]  * x[i, j] for j in customers)
-        for i in customers))
-        + alpha * c * quicksum(distances[k][l] * y[i, k, l] for i in customers for k in customers for l in customers), 
-        GRB.MINIMIZE)
+    model.setObjective(c * (quicksum(distances[i][j] * quicksum(demands[i][j] + demands[j][i] for j in customers) * x[i, j] 
+                                     for j in customers for i in customers))
+                        + alpha * c * quicksum(distances[k][l] * y[i, k, l] for i in customers for k in customers for l in customers)
+        , GRB.MINIMIZE)
     
 
     # --- Solve model ---
 
     # If you want to solve just the LP relaxation, uncomment the lines below
-    # model.update()
-    # model = model.relax()
+    model.update()
+    model = model.relax()
 
     model.optimize()
     # model.write("model.lp")
@@ -99,6 +98,6 @@ def solve(p, c, alpha, customers, distances, demands):
 
 
 if __name__ == "__main__":
-    p, c, alpha, customers, distances, demands = read_instance("n20.json")
+    p, c, alpha, customers, distances, demands = read_instance("n10.json")
 
     solve(p, c, alpha, customers, distances, demands) 

@@ -37,24 +37,53 @@ def solve(p, c, alpha, customers, distances, demands):
         for j in customers:
             for k in customers:
                 for l in customers:
-                    x[i, j, k, l] = model.addVar(vtype="c", lb=0, name=f"x_{i}_{j}_{k}_{l}")
-
-    # for ... 
-        # x[i, j, k, l] = model.addVar(vtype="c", lb=0, name=f"x_{i}_{j}_{k}_{l}",
-        # obj = ...)
-
-    # more variables are necessary
-
+                    x[i, j, k, l] = model.addVar(vtype="b", name=f"x_{i}_{j}_{k}_{l}")
+                    
+    # x_i_k equal to one if and only if node i is assigned to hub k
+    z = tupledict()
+    for i in customers:
+        for k in customers:
+            z[i, k] = model.addVar(vtype="b", name=f"z_{i}_{k}")
+                                            
     model.update()
 
     # --- Constraints ---
+    # 1. maximal p hubs
+    model.addConstr(quicksum(z[i, i] for i in customers) <= p)
+
+    # 2. each customer is served by exactly one hub
+    for i in customers:
+        model.addConstr(quicksum(z[i, k] for k in customers) == 1)
+    # 3. customers are assigned to open hubs
+        for k in customers:
+            model.addConstr(z[i, k] <= z[k, k])
+
+    # 4. flow conservation
+    # x_i_j_k_l = 1 if and only if z_i_k = 1 and z_j_l = 1
+    for i in customers:
+        for j in customers:
+            for k in customers:
+                for l in customers:
+                    model.addConstr(2 * x[i, j, k, l] <= z[i, k] + z[j, l])
+
+    for i in customers:
+        for j in customers:
+            model.addConstr(quicksum(x[i, j, k, l] for k in customers for l in customers) == 1)
+        
+
+    # ---- Objective ----
+    model.setObjective(alpha * c * quicksum(distances[k][l] * demands[i][j] * x[i, j, k, l] 
+                                for i in customers for j in customers for k in customers for l in customers)
+                    + c * quicksum(distances[i][k] * quicksum(demands[i][j] + demands[j][i] for j in customers) * z[i, k] 
+                                for i in customers for k in customers)
+        , GRB.MINIMIZE)
 
 
     # --- Solve model ---
 
     # If you want to solve just the LP relaxation, uncomment the lines below
-    # model.update()
-    # model = model.relax()
+    model.update()
+    model = model.relax()
 
     model.optimize()
     # model.write("model.lp")
