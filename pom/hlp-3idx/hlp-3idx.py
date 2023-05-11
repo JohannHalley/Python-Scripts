@@ -28,6 +28,8 @@ def solve(p, c, alpha, customers, distances, demands):
     # NOTE: Please do not turn off cutting planes in your final submission
 
     # --- Do we need to prepare something? ---
+    # get the max demand
+    max_demand = sum([max(demands[i]) for i in customers])
 
     # --- Variables ---
 
@@ -35,20 +37,17 @@ def solve(p, c, alpha, customers, distances, demands):
     x = tupledict()
     for i in customers:
         for k in customers:
-            x[i, k] = model.addVar(vtype="b", name=f"x_{i}_{k}")
-    
-    # y = tupledict()
-    # for ... 
-        # y[i, k, l] = model.addVar(vtype="c", lb=0, name=f"y_{i}_{k}_{l}",
-        # obj = ...)
+            x[i, k] = model.addVar(vtype="b", name=f"x_{i}_{k}"
+                                   , obj = c * distances[i][k] * (sum(demands[i][j]  for j in customers) + 
+                                                                  sum(demands[j][i] for j in customers)))
 
     # y is the amount of demand originating from customer i that transported from hub k to hub l
     y = tupledict()
     for i in customers:
         for k in customers:
             for l in customers:
-                y[i, k, l] = model.addVar(vtype="c", lb=0, name=f"y_{i}_{k}_{l}")
-    
+                y[i, k, l] = model.addVar(vtype="c", lb=0, name=f"y_{i}_{k}_{l}"
+                                          , obj = alpha * c * distances[k][l])    
 
     # -------------------------------------------------------------------------
     model.update()
@@ -65,27 +64,24 @@ def solve(p, c, alpha, customers, distances, demands):
         for k in customers:
             model.addConstr(x[i, k] <= x[k, k])
     
+    # constraints for y, Intra-hub flows only allowed if hub is open
+    for i in customers:
+        for k in customers:
+            for l in customers:
+                model.addConstr(y[i, k, l] <= x[k, k] * max_demand)
+                model.addConstr(y[i, k, l] <= x[l, l] * max_demand)
+
     # 4. the flow entering to hub l either directly from customer i or via other hubs k 
     # has to be equal to the flow leaving to either other hubs k or to destination nodes j
     for i in customers:
         for l in customers:
             model.addConstr(quicksum(demands[i][j] for j in customers) * x[i, l] + quicksum(y[i, k, l] for k in customers) == 
-                            quicksum(y[i, l, k] for k in customers) + quicksum(demands[i][j] * x[j, l] for j in customers))
-        
-
-    # --- Objective ---
-    # minimize the total cost
-    model.setObjective(c * (quicksum(distances[i][j] * quicksum(demands[i][j] + demands[j][i] for j in customers) * x[i, j] 
-                                     for j in customers for i in customers))
-                        + alpha * c * quicksum(distances[k][l] * y[i, k, l] for i in customers for k in customers for l in customers)
-        , GRB.MINIMIZE)
-    
+                            quicksum(demands[i][j] * x[j, l] for j in customers) + quicksum(y[i, l, k] for k in customers))
 
     # --- Solve model ---
-
     # If you want to solve just the LP relaxation, uncomment the lines below
-    model.update()
-    model = model.relax()
+    # model.update()
+    # model = model.relax()
 
     model.optimize()
     # model.write("model.lp")
