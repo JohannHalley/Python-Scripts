@@ -1,7 +1,6 @@
 import networkx as nx
 from gurobipy import *
 
-
 def solve(instance_path):
     # Read Graph from instance path
     G = nx.read_adjlist(instance_path)
